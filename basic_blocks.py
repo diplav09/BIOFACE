@@ -107,14 +107,29 @@ class Decoder(nn.Module):
 class MultipleDecoder(nn.Module):
 	def __inti__(self, in_channels,out_channels):
 		super(MultipleDecoder, self).__init__()
+		self.lightVectorLSize = 15
+		self.bsize = 2
 		self.enc  = Encoder(in_channels)
 		self.dec1 = Decoder(out_channels)
 		self.dec2 = Decoder(out_channels)
 		self.dec3 = Decoder(out_channels)		
 		self.dec4 = Decoder(out_channels)
+		self.fc1  = SingleConv(512,512,3)  # in code kernel size is given as 4
+		self.fc2  = SingleConv(512,512,1)  # FC layer
+		self.fc3  = SingleConv(512,self.lightVectorLSize + self.bsize,1)  # FC layer for lighting and camera parameter+ lighting condition
+
 	def forward(self, x):
 		x1,x2,x3,x4,x5 = self.enc(x)
 		fmel     = self.dec1(x1,x2,x3,x4,x5)
 		fblood   = self.dec2(x1,x2,x3,x4,x5)
 		Shading  = self.dec3(x1,x2,x3,x4,x5)
 		specmask = self.dec4(x1,x2,x3,x4,x5)
+
+		y1 = self.fc1(x5)
+		y2 = self.fc2(y1)
+		y3 = self.fc2(y2)
+		# b,ch,h,w
+		lightingparameters = y3[:,0:self.lightVectorLSize,:,:]
+		nbatch = y3.size()[0]
+		b = torch.reshape( y3[:,self.lightVectorLSize:self.lightVectorLSize + self.bsize,:,:], (self.bsize, nbatch))
+		return lightingparameters,b,fmel,fblood,Shading,specmask
