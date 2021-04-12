@@ -6,7 +6,7 @@ import torch.nn.functional as F
 def conv3x3(in_channels, out_channels, kernel_size, stride, dilation, padding):
     return nn.Conv2d(in_channels, out_channels, kernel_size,stride, dilation, padding)
 
-def conv(in_channels, out_channels, kernel_size, bias= True, padding = 1, stride = 1):
+def conv(in_channels, out_channels, kernel_size, bias= False, padding = 1, stride = 1):
 	return nn.Conv2d(in_channels, out_channels, kernel_size, padding= (kernel_size//2), bias = bias, stride = stride)
 
 
@@ -94,7 +94,7 @@ class Decoder(nn.Module):
 		self.up2 = Up(256,128)
 		self.up3 = Up(128,64)
 		self.up4 = Up(64,32)
-		self.up5 = SingleConv(32, out_channels, 3)
+		self.up5 = conv(32, out_channels, 3)
 
 	def forward(self, x1, x2, x3, x4, x5):
 		x = self.up1(x5,x4)
@@ -107,4 +107,14 @@ class Decoder(nn.Module):
 class MultipleDecoder(nn.Module):
 	def __inti__(self, in_channels,out_channels):
 		super(MultipleDecoder, self).__init__()
-		self.enc = 
+		self.enc  = Encoder(in_channels)
+		self.dec1 = Decoder(out_channels)
+		self.dec2 = Decoder(out_channels)
+		self.dec3 = Decoder(out_channels)		
+		self.dec4 = Decoder(out_channels)
+	def forward(self, x):
+		x1,x2,x3,x4,x5 = self.enc(x)
+		fmel     = self.dec1(x1,x2,x3,x4,x5)
+		fblood   = self.dec2(x1,x2,x3,x4,x5)
+		Shading  = self.dec3(x1,x2,x3,x4,x5)
+		specmask = self.dec4(x1,x2,x3,x4,x5)
