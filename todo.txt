@@ -1,0 +1,5 @@
+-extract variable from mat file in same dimension and change code accordingly
+-implement setup.mat
+-check where function vl_nnillumD is defined in iluumination model
+-check dimensionality issue in computeSpecularities 
+-check the .mat files

@@ -6,8 +6,30 @@ from torch.optim import Adam
 import torch
 import torch.nn as nn
 
+def load_matfiles(data_path):
+	illF = loadmat(data_path + 'illF.mat')
+	illF = illF['illF']  # 1x 33 x 12
+	
+	illumDmeasured = loadmat(data_path + 'illumDmeasured.mat')
+	illumDmeasured = illumDmeasured['illumDmeasured']	
+
+	illumA = loadmat(data_path + 'illumA.mat')
+	illumA = illumA['illumA']
+
+	Newskincolour = loadmat(data_path + 'Newskincolour.mat')
+	Newskincolour = Newskincolour['Newskincolour']
+
+	rgbCMF = loadmat(data_path + 'rgbCMF.mat')
+	rgbCMF = rgbCMF['rgbCMF']
+
+	Tmatrix = loadmat(data_path + 'Tmatrix.mat')
+	Tmatrix = Tmatrix['Tmatrix']
+
+	XYZspace = loadmat(data_path + 'XYZspace.mat')
+	XYZspace = XYZspace['XYZspace']
 # to scale the parameter 
 def ScaleNet(lightingparameters,b,fmel,fblood,Shading,specmask,bSize):
+#	  lightingparameters : B x 15 x 1 x 1
 #     weightA  : B x 1 x 1 x 1  
 #     weightD  : B x 1 x 1 x 1  
 #     CCT      : B x 1 x 1 x 1  
@@ -24,8 +46,8 @@ def ScaleNet(lightingparameters,b,fmel,fblood,Shading,specmask,bSize):
 	weightA  = lightingweights[:,0,:,:]
 	weightD  = lightingweights[:,1,:,:]
 	Fweights = lightingweights[:,2:14,:,:]
-	CCT      =  lightingparameters[:,15,:,:]
-	CCT      = ((22 - 1)./ (1 + torch.exp(-CCT))) + 1;
+	CCT      =  lightingparameters[:,14,:,:]
+	CCT      = ((22 - 1) / (1 + torch.exp(-CCT))) + 1;
 	b = 6.*(torch.sigmoid(b))-3
 	BGrid = torch.reshape(b,(bSize,1,1,nbatch)) # 2 x 1 x 1 x B check this reshape
 	BGrid = BGrid / 3
@@ -45,52 +67,83 @@ def illuminationModel(weightA,weightD,Fweights,CCT,illumA,illumDNorm,illumFNorm)
 #     illumA     : 1 x 1 x 33 x B
 #     illumDNorm : 1 x 1 x 33 x 22
 #     illumFNorm : 1 x 1 x 33 x 12
-	illumA = illumA.permute(3,2,0,1)  # B x 33 x 1 x 1
-	illuminantA = illumA * weightA # B x 33 x 1 x 1
+  illumA = illumA.permute(3,2,0,1)  # B x 33 x 1 x 1
+  print(illumA.size())
+  illuminantA = illumA * weightA # B x 33 x 1 x 1
 
-	# don't know this layer. check where function vl_nnillumD is defined 
-	# illumDlayer = Layer.fromFunction(@vl_nnillumD);
-	# illD   = illumDlayer(CCT,illumDNorm);
-	# illuminantD = illD.*weightD;
+  # don't know this layer. check where function vl_nnillumD is defined 
+  # illumDlayer = Layer.fromFunction(@vl_nnillumD);
+  # illD   = illumDlayer(CCT,illumDNorm);
+  # illuminantD = illD.*weightD;
 
-	# illuminantD should be converted to B x 33 x 1 x 1
-	illumDNorm = illumDNorm.permute(3,2,0,1) # 22 x 33 x 1 x 1
-	illumDNorm = torch.unsqueeze(torch.sum(illuminantF,0),0) # 1 x 33 x 1 x 1
-	illuminantD = CCT*illumDNorm*weightD  
+  # illuminantD should be converted to B x 33 x 1 x 1
+  illumDNorm = illumDNorm.permute(3,2,0,1) # 22 x 33 x 1 x 1
+  illumDNorm = torch.unsqueeze(torch.sum(illumDNorm,0),0) # 1 x 33 x 1 x 1
+  illuminantD = CCT*illumDNorm*weightD  
 
-	illumFNorm = illumFNorm.permute(0,2,3,1) #permute to 1 x 33 x 12 x 1
-	illuminantF = illumFNorm*Fweights # 1 x 33 x 12 x B
-	illuminantF = torch.unsqueeze(torch.sum(illuminantF,2),2) # check if dimension is reduced 1 x 33 x 1 x B
-	illuminantF = illuminantF.permute(4,1,0,2) # B x 33 x 1 x 1
-	e = illuminantA + illuminantD +illuminantF
-	esum = torch.unsqueeze(torch.sum(e,1),1) # sum across channel
-	e = e / esum
+  illumFNorm = illumFNorm.permute(0,2,3,1) #permute to 1 x 33 x 12 x 1
+  Fweights = Fweights.permute(2,3,1,0)
+  illuminantF = illumFNorm*Fweights # 1 x 33 x 12 x B
+  illuminantF = torch.unsqueeze(torch.sum(illuminantF,2),2) # check if dimension is reduced 1 x 33 x 1 x B
+  illuminantF = illuminantF.permute(3,1,0,2) # B x 33 x 1 x 1
+  e = illuminantA + illuminantD +illuminantF
+  esum = torch.unsqueeze(torch.sum(e,1),1) # sum across channel
+  e = e / esum
 
-	return e
+  return e
 
 def cameraModel(mu,PC,b,wavelength):
 # Inputs:
 #     mu         : B x 1 x 1 x 1 
-#     PC         : B x 1 x 1 x 1
+#     PC         : B x 1 x 1 x 1 ?? actually is 99 x 2
 #     b          : B x 2 x 1 x 1 
 #     wavelength : 33
 
 # Outputs:
 #     Sr,Sg,Sb   : B x 33 x 1 x 1
 
-	nbatch = b.size()[0]
-	## PCA model
-	S = torch.matmul(PC,b) + mu # 99 x nbatch  ??? how is 99 coming in dimension
-	rel = nn.ReLU()
-	S =  rel(S)
-	S = torch.squeeze(S)    
-	# S.name='S'; # Clamp negative values to zero: positive 99 x nbatch
-	## split up S into Sr, Sg, Sb 
-	Sr = torch.reshape(S[:,0:wavelength],(nbatch, wavelength, 1, 1))                  
-	Sg = torch.reshape(S[:,wavelength:wavelength*2],(nbatch, wavelength, 1, 1))     
-	Sb = torch.reshape(S[:,wavelength*2:wavelength*3],(nbatch, wavelength, 1, 1))
+    nbatch = b.size()[0]
+    ## PCA model
+    b = torch.squeeze(b).float()
+    PC = torch.squeeze(PC).float()
+    S = torch.matmul(PC,torch.transpose(b, 0, 1))  # 99 x nbatch
+    mu = torch.unsqueeze(mu,1)
+    S = S + mu  
+    rel = nn.ReLU()
+    S =  rel(S)
+    S = torch.transpose(S, 0, 1)
+    print(S.size())
+    wavelength = wavelength.int()    
+    ## split up S into Sr, Sg, Sb 
+    Sr = torch.reshape(S[:,0:wavelength],(nbatch, wavelength, 1, 1))                  
+    Sg = torch.reshape(S[:,wavelength:wavelength*2],(nbatch, wavelength, 1, 1))     
+    Sb = torch.reshape(S[:,wavelength*2:wavelength*3],(nbatch, wavelength, 1, 1))
 
-	return Sr,Sg,Sb	 
+    return Sr,Sg,Sb 
+
+def CameraSensitivityPCA(rgbCMF):
+
+	X = np.zeros((99,28))
+	Y = np.zeros((99,28))
+	redS = rgbCMF[0,0]
+	greenS= rgbCMF[0,1]
+	blueS = rgbCMF[0,2]
+	for i in range(0,28):
+	Y[0:33,i]  = redS[:,i] / np.sum(redS[:,i])
+	Y[33:66,i] = greenS[:,i] / np.sum(greenS[:,i])
+	Y[66:99,i] = blueS[:,i] / np.sum(blueS[:,i])
+	pca = PCA(n_components=28)
+	pca.fit(Y.T)
+	PC = pca.components_    # 99,27
+	EV = pca.explained_variance_  # 27,1
+	mu = pca.mean_  # 1,99
+	PC = np.matmul(PC.T[:,0:2],np.diag(np.sqrt(EV[0:2])))
+	EV = EV[0:2]
+	# [PC,~,EV,~,explained,mu] = pca(Y')
+	# PC = single(PC(:,1:2)*diag(sqrt(EV(1:2)))) # 99,2  
+	# mu = single(mu')  # 99,1
+	# EV = single(EV(1:2)) # 2,1
+	return mu,PC,EV
 
 def computelightcolour(e,Sr,Sg,Sb):
 # Inputs:
@@ -98,8 +151,9 @@ def computelightcolour(e,Sr,Sg,Sb):
 #     e                : B x 33 x 1 x 1
 #  Output:
 #  lightcolour         : Bx 3 x 1 x 1 
-	lightcolour  = torch.cat((torch.sum(Sr * e,1), torch.sum(Sg * e,1), torch.sum(Sb * e,1)),1)
-	return lightcolour 
+  lightcolour  = torch.cat((torch.sum(Sr * e,1), torch.sum(Sg * e,1), torch.sum(Sb * e,1)),1)
+  lightcolour = torch.unsqueeze(lightcolour,2)
+  return lightcolour
 
 def computeSpecularities(specmask,lightcolour):
 # Inputs:
@@ -160,9 +214,9 @@ def WhiteBalance(rawAppearance,lightcolour):
 #  Output:
 #     ImwhiteBalanced  : B x 3 x H x W 
 ## --------------------------- White Balance ------------------------------
-	WBrCh = rawAppearance[:,0,:,:]/lightcolour[:,0,:,:]  
-	WBgCh = rawAppearance[:,1,:,:]/lightcolour[:,1,:,:]
-	WBbCh = rawAppearance[:,2,:,:]/lightcolour[:,2,:,:]
+	WBrCh = torch.unsqueeze(rawAppearance[:,0,:,:]/lightcolour[:,0,:,:],1)  
+	WBgCh = torch.unsqueeze(rawAppearance[:,1,:,:]/lightcolour[:,1,:,:],1)
+	WBbCh = torch.unsqueeze(rawAppearance[:,2,:,:]/lightcolour[:,2,:,:],1)
 	ImwhiteBalanced = torch.cat((WBrCh,WBgCh,WBbCh),1)
 	return ImwhiteBalanced
 
@@ -193,15 +247,14 @@ def fromRawTosRGB(imWB,T_RAW2XYZ):
 # Output:
 #     sRGBim : B X 3 X H X W
 ##
-	Ix = T_RAW2XYZ[:,0,0,0] * imWB[:,0,:,:] + T_RAW2XYZ[:,3,0,0] * imWB[:,1,:,:] + T_RAW2XYZ[:,6,0,0] * imWB[:,2,:,:] # B X 1 X H X W
-	Iy = T_RAW2XYZ[:,1,0,0] * imWB[:,0,:,:] + T_RAW2XYZ[:,4,0,0] * imWB[:,1,:,:] + T_RAW2XYZ[:,7,0,0] * imWB[:,2,:,:] 
-	Iz = T_RAW2XYZ[:,2,0,0] * imWB[:,0,:,:] + T_RAW2XYZ[:,5,0,0] * imWB[:,1,:,:] + T_RAW2XYZ[:,8,0,0] * imWB[:,2,:,:] 
+	Ix = T_RAW2XYZ[:,0,:,:] * imWB[:,0,:,:] + T_RAW2XYZ[:,3,:,:] * imWB[:,1,:,:] + T_RAW2XYZ[:,6,:,:] * imWB[:,2,:,:] # B X 1 X H X W
+	Iy = T_RAW2XYZ[:,1,:,:] * imWB[:,0,:,:] + T_RAW2XYZ[:,4,:,:] * imWB[:,1,:,:] + T_RAW2XYZ[:,7,:,:] * imWB[:,2,:,:] 
+	Iz = T_RAW2XYZ[:,2,:,:] * imWB[:,0,:,:] + T_RAW2XYZ[:,5,:,:] * imWB[:,1,:,:] + T_RAW2XYZ[:,8,:,:] * imWB[:,2,:,:] 
 	Ix = torch.unsqueeze(Ix,1)
 	Iy = torch.unsqueeze(Iy,1)
 	Iz = torch.unsqueeze(Iz,1)
 	Ixyz = torch.cat((Ix,Iy,Iz),1) # B X 3 X H X W
-
-	Txyzrgb = torch.tensor([3.2406, -1.5372, -0.4986; -0.9689, 1.8758, 0.0415; 0.0557, -0.2040, 1.057])
+	Txyzrgb = torch.tensor([3.2406, -1.5372, -0.4986, -0.9689, 1.8758, 0.0415, 0.0557, -0.2040, 1.057 ])
 
 	# if isa(imWB, 'Layer')
 	#   Txyzrgb = Param('value',Txyzrgb,'learningRate',0); Txyzrgb.name='Txyzrgb';
@@ -218,3 +271,4 @@ def fromRawTosRGB(imWB,T_RAW2XYZ):
 	rel = nn.ReLU()
 	sRGBim =  rel(sRGBim)
 	return sRGBim 
+

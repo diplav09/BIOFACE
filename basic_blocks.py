@@ -131,5 +131,5 @@ class MultipleDecoder(nn.Module):
 		# b,ch,h,w
 		lightingparameters = y3[:,0:self.lightVectorLSize,:,:]
 		nbatch = y3.size()[0]
-		b = torch.reshape( y3[:,self.lightVectorLSize:self.lightVectorLSize + self.bsize,:,:], (self.bsize, nbatch))
+		b = torch.reshape( y3[:,self.lightVectorLSize:self.lightVectorLSize + self.bsize,:,:], (self.bsize, nbatch,1,1))
 		return lightingparameters,b,fmel,fblood,Shading,specmask
