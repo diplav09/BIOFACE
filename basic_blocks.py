@@ -105,7 +105,7 @@ class Decoder(nn.Module):
 		return x
 
 class MultipleDecoder(nn.Module):
-	def __inti__(self, in_channels,out_channels):
+	def __inti__(self, in_channels =3 ,out_channels = 1):
 		super(MultipleDecoder, self).__init__()
 		self.lightVectorLSize = 15
 		self.bsize = 2

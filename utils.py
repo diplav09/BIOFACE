@@ -5,6 +5,7 @@ from torchvision import transforms
 from torch.optim import Adam
 import torch
 import torch.nn as nn
+from sklearn.decomposition import PCA
 
 def load_matfiles(data_path):
 	illF = loadmat(data_path + 'illF.mat')
@@ -27,6 +28,8 @@ def load_matfiles(data_path):
 
 	XYZspace = loadmat(data_path + 'XYZspace.mat')
 	XYZspace = XYZspace['XYZspace']
+
+	return illF, illumDmeasured, illumA, Newskincolour, rgbCMF, Tmatrix, XYZspace
 # to scale the parameter 
 def ScaleNet(lightingparameters,b,fmel,fblood,Shading,specmask,bSize):
 #	  lightingparameters : B x 15 x 1 x 1
@@ -123,27 +126,27 @@ def cameraModel(mu,PC,b,wavelength):
 
 def CameraSensitivityPCA(rgbCMF):
 
-	X = np.zeros((99,28))
-	Y = np.zeros((99,28))
-	redS = rgbCMF[0,0]
-	greenS= rgbCMF[0,1]
-	blueS = rgbCMF[0,2]
-	for i in range(0,28):
-	Y[0:33,i]  = redS[:,i] / np.sum(redS[:,i])
-	Y[33:66,i] = greenS[:,i] / np.sum(greenS[:,i])
-	Y[66:99,i] = blueS[:,i] / np.sum(blueS[:,i])
-	pca = PCA(n_components=28)
-	pca.fit(Y.T)
-	PC = pca.components_    # 99,27
-	EV = pca.explained_variance_  # 27,1
-	mu = pca.mean_  # 1,99
-	PC = np.matmul(PC.T[:,0:2],np.diag(np.sqrt(EV[0:2])))
-	EV = EV[0:2]
-	# [PC,~,EV,~,explained,mu] = pca(Y')
-	# PC = single(PC(:,1:2)*diag(sqrt(EV(1:2)))) # 99,2  
-	# mu = single(mu')  # 99,1
-	# EV = single(EV(1:2)) # 2,1
-	return mu,PC,EV
+  X = np.zeros((99,28))
+  Y = np.zeros((99,28))
+  redS = rgbCMF[0,0]
+  greenS= rgbCMF[0,1]
+  blueS = rgbCMF[0,2]
+  for i in range(0,28):
+    Y[0:33,i]  = redS[:,i] / np.sum(redS[:,i])
+    Y[33:66,i] = greenS[:,i] / np.sum(greenS[:,i])
+    Y[66:99,i] = blueS[:,i] / np.sum(blueS[:,i])
+  pca = PCA(n_components=28)
+  pca.fit(Y.T)
+  PC = pca.components_    # 99,27
+  EV = pca.explained_variance_  # 27,1
+  mu = pca.mean_  # 1,99
+  PC = np.matmul(PC.T[:,0:2],np.diag(np.sqrt(EV[0:2])))
+  EV = EV[0:2]
+  # [PC,~,EV,~,explained,mu] = pca(Y')
+  # PC = single(PC(:,1:2)*diag(sqrt(EV(1:2)))) # 99,2  
+  # mu = single(mu')  # 99,1
+  # EV = single(EV(1:2)) # 2,1
+  return mu,PC,EV
 
 def computelightcolour(e,Sr,Sg,Sb):
 # Inputs:
