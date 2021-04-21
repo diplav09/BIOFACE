@@ -109,15 +109,16 @@ def cameraModel(mu,PC,b,wavelength):
 
     nbatch = b.size()[0]
     ## PCA model
-    b = torch.squeeze(b).float()
-    PC = torch.squeeze(PC).float()
+    b = torch.reshape(b,(nbatch,2)).float()
+    PC = torch.reshape(PC,(99,2)).float()
+    # print(b.size(),PC.size())
     S = torch.matmul(PC,torch.transpose(b, 0, 1))  # 99 x nbatch
     mu = torch.unsqueeze(mu,1)
     S = S + mu  
     rel = nn.ReLU()
     S =  rel(S)
     S = torch.transpose(S, 0, 1)
-    print(S.size())
+    # print(S.size())
     wavelength = wavelength.int()    
     ## split up S into Sr, Sg, Sb 
     Sr = torch.reshape(S[:,0:wavelength],(nbatch, wavelength, 1, 1))                  
