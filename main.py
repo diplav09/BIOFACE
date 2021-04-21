@@ -32,7 +32,7 @@ def loss_L2_regularization(output):
 def loss_shade(predictedShading, actualshading, actualmasks):
 	scale = torch.sum( torch.sum( (actualshading * predictedShading) * actualmasks, 2), 2) / torch.sum( torch.sum( torch.square(predictedShading) * actualmasks, 2), 2)
 
-	scale = torch.reshape(scale,(nbatchs,1,1,1))
+	scale = torch.reshape(scale,(batch_size,1,1,1))
 	predictedShading = predictedShading * scale
 	alpha = (actualshading - predictedShading) * actualmasks
 	loss = torch.sum(torch.square(alpha))
@@ -53,6 +53,7 @@ def train_model():
 	illF = illF.reshape((1,1,33,12))
 	illumDmeasured = illumDmeasured.T.reshape((1,1,33,22))
 	illumA = illumA.astype(np.float32) / np.sum(illumA)             # 1,1,33
+	illumA = np.expand_dims(illumA, axis=3)
 	illumA = np.tile(illumA,(1,1,1,batch_size))  # additional line
 	illumDNorm = illumDmeasured.astype(np.float32)
 	for i in range(0,22):
@@ -66,13 +67,13 @@ def train_model():
 	muim = torch.reshape(celebaimdb_averageImage,(1,3,1,1))
 	bSize = 2
 
-	illumA = torch.from_numpy(illumA)
-	illumDNorm = torch.from_numpy(illumDNorm)
-	illumFNorm = torch.from_numpy(illumFNorm)
-	mu = torch.from_numpy(mu)
-	PC = torch.from_numpy(PC)
-	Newskincolour = torch.from_numpy(Newskincolour)
-	Tmatrix = torch.from_numpy(Tmatrix)
+	illumA = torch.from_numpy(illumA).cuda()
+	illumDNorm = torch.from_numpy(illumDNorm).cuda()
+	illumFNorm = torch.from_numpy(illumFNorm).cuda()
+	mu = torch.from_numpy(mu).cuda()
+	PC = torch.from_numpy(PC).cuda()
+	Newskincolour = torch.from_numpy(Newskincolour).cuda()
+	Tmatrix = torch.from_numpy(Tmatrix).cuda()
 	print("pre proc done")
 
 	torch.backends.cudnn.deterministic = True
@@ -101,7 +102,7 @@ def train_model():
 
 			optimizer.zero_grad()
 			images, actualshading, actualmasks = next(train_iter)
-			images = images.to(device, non_blocking=True)
+			images = images.to(device, non_blocking=True).float()
 			actualshading = actualshading.to(device, non_blocking=True)
 			actualmasks = actualmasks.to(device, non_blocking=True)
 			lightingparameters,b,fmel,fblood,Shading,specmask = model(images)

@@ -32,7 +32,6 @@ def load_matfiles(data_path):
 	return illF, illumDmeasured, illumA, Newskincolour, rgbCMF, Tmatrix, XYZspace
 # to scale the parameter 
 def ScaleNet(lightingparameters,b,fmel,fblood,Shading,specmask,bSize):
-#	  lightingparameters : B x 15 x 1 x 1
 #     weightA  : B x 1 x 1 x 1  
 #     weightD  : B x 1 x 1 x 1  
 #     CCT      : B x 1 x 1 x 1  
@@ -43,22 +42,25 @@ def ScaleNet(lightingparameters,b,fmel,fblood,Shading,specmask,bSize):
 #     Shading  : B x 1 x 224 x 224  
 #     specmask : B x 1 x 224 x 224  
 #     bSize    : 2
-	nbatch = lightingparameters.size()[0]
-	m = nn.Softmax(dim=1)
-	lightingweights = m(lightingparameters[:,0:14,:,:])
-	weightA  = lightingweights[:,0,:,:]
-	weightD  = lightingweights[:,1,:,:]
-	Fweights = lightingweights[:,2:14,:,:]
-	CCT      =  lightingparameters[:,14,:,:]
-	CCT      = ((22 - 1) / (1 + torch.exp(-CCT))) + 1;
-	b = 6.*(torch.sigmoid(b))-3
-	BGrid = torch.reshape(b,(bSize,1,1,nbatch)) # 2 x 1 x 1 x B check this reshape
-	BGrid = BGrid / 3
-	fmel = torch.sigmoid(fmel) *2 -1
-	fblood = torch.sigmoid(fblood) * 2 -1
-	Shading = torch.exp(Shading)
-	specmask = torch.exp(specmask)
-	return weightA,weightD,CCT,Fweights,b,BGrid,fmel,fblood,Shading,specmask
+  nbatch = lightingparameters.size()[0]
+  m = nn.Softmax(dim=1)
+  lightingweights = m(lightingparameters[:,0:14,:,:])
+  weightA  = lightingweights[:,0,:,:]
+  weightA = torch.unsqueeze(weightA,1)
+  weightD  = lightingweights[:,1,:,:]
+  weightD = torch.unsqueeze(weightD,1)
+  Fweights = lightingweights[:,2:14,:,:]
+  CCT      =  lightingparameters[:,14,:,:]
+  CCT      = ((22 - 1) / (1 + torch.exp(-CCT))) + 1;
+  CCT = torch.unsqueeze(CCT,1)
+  b = 6.*(torch.sigmoid(b))-3
+  BGrid = torch.reshape(b,(bSize,1,1,nbatch)) # 2 x 1 x 1 x B check this reshape
+  BGrid = BGrid / 3
+  fmel = torch.sigmoid(fmel) *2 -1
+  fblood = torch.sigmoid(fblood) * 2 -1
+  Shading = torch.exp(Shading)
+  specmask = torch.exp(specmask)
+  return weightA,weightD,CCT,Fweights,b,BGrid,fmel,fblood,Shading,specmask
 
 # create the illumination model from CIE standard illuminants: A,D,F
 # extract illumA,illumDNorm,illumFNorm foom mat files in util

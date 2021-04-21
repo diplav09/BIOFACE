@@ -4,7 +4,7 @@ import numpy as np
 import torch.nn.functional as F
 
 def conv3x3(in_channels, out_channels, kernel_size, stride, dilation, padding):
-    return nn.Conv2d(in_channels, out_channels, kernel_size,stride, dilation, padding)
+	return nn.Conv2d(in_channels, out_channels, kernel_size,stride, dilation, padding)
 
 def conv(in_channels, out_channels, kernel_size, bias= False, padding = 1, stride = 1):
 	return nn.Conv2d(in_channels, out_channels, kernel_size, padding= (kernel_size//2), bias = bias, stride = stride)
@@ -65,7 +65,7 @@ class Encoder(nn.Module):
 		return x1,x2,x3,x4,x5
 
 class Up(nn.Module):
-	def _init__(self ,in_channels ,out_channels, bilinear = False):
+	def __init__(self ,in_channels ,out_channels, bilinear = False):
 		super(Up, self).__init__()
 		if bilinear:
 			self.up = nn.Upsample(scale_factor = 2, mode = 'bilinear', align_corner = True)
@@ -80,7 +80,7 @@ class Up(nn.Module):
 		diffX = x2.size()[3] - x1.size()[3]
 
 		x1 = F.pad(x1, (diffX // 2, diffX - diffX // 2,
-						diffY // 2, diffY - diffy //2))
+						diffY // 2, diffY - diffY //2))
 
 		#using add instead of concat to reduce complexity
 		x = torch.add(x2,x1)
@@ -88,7 +88,7 @@ class Up(nn.Module):
 		return x
 
 class Decoder(nn.Module):
-	def _init__(self,out_channels):
+	def __init__(self, out_channels):
 		super(Decoder, self).__init__()
 		self.up1 = Up(512,256)
 		self.up2 = Up(256,128)
@@ -105,7 +105,7 @@ class Decoder(nn.Module):
 		return x
 
 class MultipleDecoder(nn.Module):
-	def __inti__(self, in_channels =3 ,out_channels = 1):
+	def __init__(self, in_channels = 3 ,out_channels = 1):
 		super(MultipleDecoder, self).__init__()
 		self.lightVectorLSize = 15
 		self.bsize = 2
@@ -115,8 +115,8 @@ class MultipleDecoder(nn.Module):
 		self.dec3 = Decoder(out_channels)		
 		self.dec4 = Decoder(out_channels)
 		self.fc1  = SingleConv(512,512,3)  # in code kernel size is given as 4
-		self.fc2  = SingleConv(512,512,1)  # FC layer
-		self.fc3  = SingleConv(512,self.lightVectorLSize + self.bsize,1)  # FC layer for lighting and camera parameter+ lighting condition
+		self.fc2  = nn.Linear(8192,512,1)  # FC layer
+		self.fc3  = nn.Linear(512,self.lightVectorLSize + self.bsize,1)  # FC layer for lighting and camera parameter+ lighting condition
 
 	def forward(self, x):
 		x1,x2,x3,x4,x5 = self.enc(x)
@@ -126,10 +126,18 @@ class MultipleDecoder(nn.Module):
 		specmask = self.dec4(x1,x2,x3,x4,x5)
 
 		y1 = self.fc1(x5)
+		y1 = torch.flatten(y1, 1)
+		# print(y1.size())
 		y2 = self.fc2(y1)
-		y3 = self.fc2(y2)
+		y3 = self.fc3(y2)
 		# b,ch,h,w
-		lightingparameters = y3[:,0:self.lightVectorLSize,:,:]
+		lightingparameters = y3[:,0:self.lightVectorLSize]
 		nbatch = y3.size()[0]
-		b = torch.reshape( y3[:,self.lightVectorLSize:self.lightVectorLSize + self.bsize,:,:], (self.bsize, nbatch,1,1))
+		lightingparameters = torch.reshape(lightingparameters, (nbatch,self.lightVectorLSize,1,1))
+		# print(y3.size())
+		b = torch.reshape( y3[:,self.lightVectorLSize:self.lightVectorLSize + self.bsize], (nbatch, self.bsize,1,1))
 		return lightingparameters,b,fmel,fblood,Shading,specmask
+
+def Net():
+  model = MultipleDecoder(in_channels = 3 ,out_channels = 1)
+  return model
