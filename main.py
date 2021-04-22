@@ -89,10 +89,11 @@ def train_model():
 	if load_checkpoint_path is not None:
 		checkpoint = torch.load(load_checkpoint_path)
 		model.load_state_dict(checkpoint, strict=True)
+		print("check point loaded")
 	# Loss define
 	MSE_loss = torch.nn.MSELoss()
 	print("train start")
-	for epoch in range(num_train_epochs):
+	for epoch in range(init_epoch,num_train_epochs):
 
 		torch.cuda.empty_cache()
 
@@ -117,11 +118,12 @@ def train_model():
 			ImwhiteBalanced = WhiteBalance(rawAppearance,lightcolour)
 			T_RAW2XYZ = findT(Tmatrix,BGrid)
 			sRGBim = fromRawTosRGB(ImwhiteBalanced,T_RAW2XYZ)
-
+			rel = nn.ReLU()
+			sRGBim = rel(sRGBim)
 			# Camera parameter loss:
 			priorloss = loss_L2_regularization(b)
 			# L2: appearance loss
-			appearanceloss = MSE_loss(sRGBim * actualmasks, images * actualmasks)
+			appearanceloss = MSE_loss(sRGBim , images)
 
 			shadingloss = loss_shade(Shading, actualshading, actualmasks)
 			# L1 sparsity loss

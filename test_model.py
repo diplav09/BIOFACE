@@ -13,7 +13,7 @@ to_image = transforms.Compose([transforms.ToPILImage()])
 dataset_dir = '/content/gdrive/My Drive/bioface/sample.hdf5'
 data_path = '/content/gdrive/My Drive/bioface/'
 batch_size = 1
-weight_path = '/content/gdrive/My Drive/bioface/models/cnn_epoch_199.pth'
+weight_path = '/content/gdrive/My Drive/bioface/models/cnn_epoch_62.pth'
 
 def test_model():
 
@@ -63,7 +63,7 @@ def test_model():
 	with torch.no_grad():
 
 		test_iter = iter(test_loader)
-		for j in range(0,2):
+		for j in range(0,3):
 			print("Processing image " + str(j))
 			torch.cuda.empty_cache()
 			images, actualshading, actualmasks = next(test_iter)
@@ -82,13 +82,23 @@ def test_model():
 			ImwhiteBalanced = WhiteBalance(rawAppearance,lightcolour)
 			T_RAW2XYZ = findT(Tmatrix,BGrid)
 			sRGBim = fromRawTosRGB(ImwhiteBalanced,T_RAW2XYZ)
-			sRGBim = np.asarray(to_image(torch.squeeze(sRGBim.float().detach().cpu())))
+			rel = nn.ReLU()
+			sRGBim = rel(sRGBim)
+			sRGBim = np.asarray(torch.squeeze(sRGBim.float().detach().cpu()))
+			sRGBim = sRGBim.transpose(1,2,0)
+			plt.imshow(sRGBim)
+			plt.show()
+			sRGBim[:,:,0] = (sRGBim[:,:,0] / np.amax(sRGBim[:,:,0])) * 255
+			sRGBim[:,:,1] = (sRGBim[:,:,1] / np.amax(sRGBim[:,:,1])) * 255
+			sRGBim[:,:,2] = (sRGBim[:,:,2] / np.amax(sRGBim[:,:,2])) * 255
+			print(sRGBim.shape,np.amax(sRGBim[:,:,0]),np.amax(sRGBim[:,:,1]),np.amax(sRGBim[:,:,2]))
 			Shading = np.asarray(to_image(torch.squeeze(Shading.float().detach().cpu())))
 			Specularities = np.asarray(to_image(torch.squeeze(Specularities.float().detach().cpu())))
 			fmel = np.asarray(to_image(torch.squeeze(fmel.float().detach().cpu())))
 			fblood = np.asarray(to_image(torch.squeeze(fblood.float().detach().cpu())))
 			images = np.asarray(to_image(torch.squeeze(images.float().detach().cpu())))
-
+			plt.imshow(sRGBim)
+			plt.show()
 			imageio.imwrite("results/" + str(j) + "_recons_.png", sRGBim)
 			imageio.imwrite("results/" + str(j) + "_diffuse_.png", Shading)
 			imageio.imwrite("results/" + str(j) + "_specular_.png", Specularities)
